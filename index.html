@@ -887,9 +887,7 @@ function buildSparkline(cod, currentTotal){
 // ── EMAIL ────────────────────────────────────────────────────────────────────
 function buildPreview(d,fecha,noav){
   var ps=Math.round(d.pct*100)+'%';
-  var extra=noav
-    ?'<p style="margin-top:10px">Noté que esta semana no hubo nuevos ingresos registrados. Estoy a disposición para conectarnos y ver juntos cómo puedo acompañarte — a veces una charla corta ayuda a destrabar cosas. Avisáme cuando tengas un momento y coordinamos.</p>'
-    :'';
+  var extra='<p style="margin-top:10px">Quedo a disposición ante cualquier consulta que necesiten realizar.</p>';
   var contacto=CONTACTOS[d.cod]||{};
   var saludo=contacto.saludo||'Estimados/as';
   return '<p>'+saludo+':</p>'+
