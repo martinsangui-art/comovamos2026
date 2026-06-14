@@ -1846,7 +1846,7 @@ function abrirModalEnvio(){
   // Email destinatario (para prueba)
   var emailRow=document.createElement('div');
   emailRow.style.cssText='margin-bottom:12px';
-  emailRow.innerHTML='<label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Destinatario (prueba)</label>';
+  emailRow.innerHTML='<label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:5px">Email fallback (para sedes sin contacto registrado)</label>';
   var emailInput=document.createElement('input');
   emailInput.type='email';
   emailInput.id='envio-email';
@@ -1855,7 +1855,7 @@ function abrirModalEnvio(){
   emailRow.appendChild(emailInput);
   var emailNote=document.createElement('p');
   emailNote.style.cssText='font-size:10px;color:#9ca3af;margin-top:4px';
-  emailNote.textContent='Cada sede recibe en su propio email. Este campo es el fallback si una sede no tiene contacto registrado.';
+  emailNote.textContent='Cada sede recibe en su propio email registrado en el sistema. Este campo solo se usa si una sede no tiene contacto.';
   emailRow.appendChild(emailNote);
   body.appendChild(emailRow);
 
@@ -2032,7 +2032,8 @@ async function iniciarEnvio(lista){
     var asunto='Como Vamos — 2do Ingreso 2026 — '+fecha;
 
     var contactoSede=CONTACTOS[d.cod]||{};
-    var emailReal=contactoSede.email||emailDest;
+    // Usar email del contacto siempre que exista — emailDest solo como fallback de emergencia
+    var emailReal=contactoSede.email?contactoSede.email:emailDest;
     var payload={
       to: emailReal,
       subject: asunto,
@@ -2044,7 +2045,7 @@ async function iniciarEnvio(lista){
     };
 
     try{
-      logEnvio('Enviando ['+d.cod+'] '+d.sede+'...','info');
+      logEnvio('Enviando ['+d.cod+'] '+d.sede+' → '+emailReal+'...','info');
       var resp=await fetch(WEBHOOK_URL,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
