@@ -1932,7 +1932,7 @@ async function iniciarEnvio(lista){
 
     actualizarProgreso(i+1,lista.length);
     // Pequeña pausa para no saturar el webhook
-    await new Promise(function(r){setTimeout(r,300);});
+    await new Promise(function(r){setTimeout(r,800);});
   }
 
   ENVIO_ACTIVO=false;
