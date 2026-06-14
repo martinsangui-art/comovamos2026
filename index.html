@@ -1889,8 +1889,9 @@ async function iniciarEnvio(lista){
 
   var fecha=fmtDate(document.getElementById('fecha').value);
   var exitosos=0,errores=0;
+  var logItems=[]; // acumular para el resumen final
 
-  logEnvio('Iniciando envío de '+lista.length+' emails...','info');
+  logEnvio('Iniciando envio de '+lista.length+' emails...','info');
   logEnvio('Destinatario de prueba: '+emailDest,'info');
   logEnvio('─────────────────────────────────','info');
 
@@ -1898,7 +1899,7 @@ async function iniciarEnvio(lista){
     var d=lista[i];
     var noav=sinAvance(d);
     var htmlEmail=buildPreview(d,fecha,noav);
-    var asunto='Cómo Vamos — 2do Ingreso 2026 — '+fecha+' — '+d.sede;
+    var asunto='Como Vamos — 2do Ingreso 2026 — '+fecha;
 
     var payload={
       to: emailDest,
@@ -1906,7 +1907,8 @@ async function iniciarEnvio(lista){
       html: htmlEmail,
       sede: d.sede,
       cod: d.cod,
-      fecha: fecha
+      fecha: fecha,
+      tipo: 'email'
     };
 
     try{
@@ -1921,23 +1923,28 @@ async function iniciarEnvio(lista){
         exitosos++;
         COPIED[d.cod]=true;
         logEnvio('✅ OK — '+d.sede,'ok');
+        logItems.push({cod:d.cod,sede:d.sede,to:emailDest,estado:'OK',pct:Math.round(d.pct*100)+'%'});
       } else {
         errores++;
         logEnvio('❌ Error '+resp.status+' — '+d.sede,'err');
+        logItems.push({cod:d.cod,sede:d.sede,to:emailDest,estado:'ERROR '+resp.status,pct:Math.round(d.pct*100)+'%'});
       }
     }catch(err){
       errores++;
-      logEnvio('❌ Error de red — '+d.sede+': '+err.message,'err');
+      logEnvio('❌ Error de red — '+d.sede,'err');
+      logItems.push({cod:d.cod,sede:d.sede,to:emailDest,estado:'ERROR RED',pct:Math.round(d.pct*100)+'%'});
     }
 
     actualizarProgreso(i+1,lista.length);
-    // Pequeña pausa para no saturar el webhook
     await new Promise(function(r){setTimeout(r,800);});
   }
 
   ENVIO_ACTIVO=false;
   logEnvio('─────────────────────────────────','info');
-  logEnvio('Envío finalizado: '+exitosos+' exitosos, '+errores+' errores','info');
+  logEnvio('Envio finalizado: '+exitosos+' exitosos, '+errores+' errores','info');
+
+  // Mandar resumen final a Make
+  await enviarResumen(logItems, exitosos, errores, fecha);
 
   if(startBtn){
     startBtn.disabled=false;
@@ -1946,6 +1953,82 @@ async function iniciarEnvio(lista){
 
   updateStats();render();
   toast('✅ '+exitosos+' emails enviados'+(errores?' · '+errores+' errores':''));
+}
+
+async function enviarResumen(logItems, exitosos, errores, fecha){
+  try{
+    logEnvio('Preparando email de resumen para Cele...','info');
+
+    // Armar HTML del resumen
+    var filas=logItems.map(function(item){
+      var color=item.estado==='OK'?'#16a34a':'#be123c';
+      var icon=item.estado==='OK'?'✅':'❌';
+      return '<tr>'+
+        '<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9">'+item.cod+'</td>'+
+        '<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9">'+item.sede+'</td>'+
+        '<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center">'+item.pct+'</td>'+
+        '<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center">'+item.to+'</td>'+
+        '<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center;color:'+color+';font-weight:700">'+icon+' '+item.estado+'</td>'+
+      '</tr>';
+    }).join('');
+
+    var htmlResumen=
+      '<div style="font-family:Arial,sans-serif;font-size:13px;color:#1a1a2e">'+
+      '<h2 style="color:#1B2A6B;border-bottom:3px solid #C8102E;padding-bottom:10px">'+
+        '📊 Resumen de envío — Cómo Vamos '+fecha+
+      '</h2>'+
+      '<div style="display:flex;gap:16px;margin-bottom:20px">'+
+        '<div style="background:#f0faf4;border-radius:8px;padding:12px 20px;text-align:center">'+
+          '<div style="font-size:28px;font-weight:800;color:#16a34a">'+exitosos+'</div>'+
+          '<div style="font-size:11px;color:#6b7280">Enviados OK</div>'+
+        '</div>'+
+        '<div style="background:#fff1f2;border-radius:8px;padding:12px 20px;text-align:center">'+
+          '<div style="font-size:28px;font-weight:800;color:#be123c">'+errores+'</div>'+
+          '<div style="font-size:11px;color:#6b7280">Con error</div>'+
+        '</div>'+
+        '<div style="background:#eff6ff;border-radius:8px;padding:12px 20px;text-align:center">'+
+          '<div style="font-size:28px;font-weight:800;color:#1B2A6B">'+(exitosos+errores)+'</div>'+
+          '<div style="font-size:11px;color:#6b7280">Total sedes</div>'+
+        '</div>'+
+      '</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+        '<tr style="background:#1B2A6B;color:#fff">'+
+          '<th style="padding:8px 10px;text-align:left">Cód</th>'+
+          '<th style="padding:8px 10px;text-align:left">Sede</th>'+
+          '<th style="padding:8px 10px;text-align:center">Cumplimiento</th>'+
+          '<th style="padding:8px 10px;text-align:center">Enviado a</th>'+
+          '<th style="padding:8px 10px;text-align:center">Estado</th>'+
+        '</tr>'+
+        filas+
+      '</table>'+
+      '<p style="margin-top:16px;font-size:11px;color:#9ca3af">Generado automáticamente por el sistema UCASAL Cómo Vamos · '+fecha+'</p>'+
+      '</div>';
+
+    var payloadResumen={
+      tipo: 'resumen',
+      to: 'mcrossi@ucasal.edu.ar',
+      subject: '✅ Resumen envío Cómo Vamos — '+fecha+' — '+exitosos+'/'+logItems.length+' OK',
+      html: htmlResumen,
+      exitosos: exitosos,
+      errores: errores,
+      total: logItems.length,
+      fecha: fecha
+    };
+
+    var resp=await fetch(WEBHOOK_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payloadResumen)
+    });
+
+    if(resp.ok){
+      logEnvio('✅ Resumen enviado a Cele','ok');
+    } else {
+      logEnvio('⚠️ No se pudo enviar el resumen','warn');
+    }
+  }catch(err){
+    logEnvio('⚠️ Error enviando resumen: '+err.message,'warn');
+  }
 }
 
 function resetApp(){
